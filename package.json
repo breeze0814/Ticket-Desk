@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node --env-file=.env --use-env-proxy src/server.js",
+    "start": "node src/server.js",
     "test": "vitest run",
-    "dev": "node --env-file=.env --watch --use-env-proxy src/server.js"
+    "dev": "node --watch src/server.js"
   },
   "dependencies": {
     "dotenv": "^16.4.7",
