@@ -65,9 +65,3 @@ function requireValue(value, envName) {
     throw new Error(`缺少 ${envName}`);
   }
 }
-
-function requireFetch(fetchImpl) {
-  if (typeof fetchImpl !== 'function') {
-    throw new Error('当前 Node.js 环境缺少 fetch');
-  }
-}
