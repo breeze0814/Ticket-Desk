@@ -66,9 +66,12 @@ export function createApp({ notifier }) {
 
 async function handleCreateTicket({ request, notifier, response }) {
   const clientIp = getClientIp(request);
+  console.log(`[${new Date().toISOString()}] 收到工单提交请求，IP: ${clientIp}`);
+
   const rateLimit = checkRateLimit(clientIp);
 
   if (!rateLimit.allowed) {
+    console.log(`[${new Date().toISOString()}] IP ${clientIp} 超出频率限制`);
     response.status(429).json({
       error: `提交过于频繁，请 ${rateLimit.remainingSeconds} 秒后再试`
     });
@@ -78,17 +81,21 @@ async function handleCreateTicket({ request, notifier, response }) {
   const validation = validateTicketInput(request.body);
 
   if (!validation.ok) {
+    console.log(`[${new Date().toISOString()}] 工单验证失败: ${validation.error}`);
     response.status(validation.status).json({ error: validation.error });
     return;
   }
 
+  console.log(`[${new Date().toISOString()}] 开始发送 Telegram 通知...`);
   try {
     await notifier.sendTicket(validation.ticket);
+    console.log(`[${new Date().toISOString()}] Telegram 通知发送成功`);
     response.status(201).json({
       message: '工单已提交',
       ticket: validation.ticket,
     });
   } catch (error) {
+    console.error(`[${new Date().toISOString()}] Telegram 通知失败:`, error);
     response.status(502).json({ error: error.message });
   }
 }

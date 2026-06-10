@@ -16,10 +16,19 @@ export function createTelegramNotifier(options = {}) {
 
 async function sendTicket({ botToken, chatId, fetchImpl, ticket }) {
   const url = `${TELEGRAM_API_BASE}/bot${botToken}/sendMessage`;
-  const response = await fetchImpl(url, buildRequest(chatId, ticket));
+  console.log(`[Telegram] 请求 URL: ${url}`);
+  console.log(`[Telegram] 代理配置: HTTP_PROXY=${process.env.HTTP_PROXY}, HTTPS_PROXY=${process.env.HTTPS_PROXY}`);
 
-  if (!response.ok) {
-    throw new Error(await buildTelegramError(response));
+  try {
+    const response = await fetchImpl(url, buildRequest(chatId, ticket));
+    console.log(`[Telegram] 响应状态: ${response.status}`);
+
+    if (!response.ok) {
+      throw new Error(await buildTelegramError(response));
+    }
+  } catch (error) {
+    console.error(`[Telegram] 请求失败:`, error);
+    throw error;
   }
 }
 
