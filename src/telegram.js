@@ -1,19 +1,25 @@
 import { formatTicketMessage } from './tickets.js';
-import { ProxyAgent } from 'undici';
+import { fetch as undiciFetch, ProxyAgent } from 'undici';
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org';
 
-function getProxyAgent() {
+function createFetchWithProxy() {
   const proxy = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
-  return proxy ? new ProxyAgent(proxy) : undefined;
+  if (!proxy) {
+    return globalThis.fetch;
+  }
+
+  const dispatcher = new ProxyAgent(proxy);
+  return (url, options) => undiciFetch(url, { ...options, dispatcher });
 }
 
 export function createTelegramNotifier(options = {}) {
-  const { botToken, chatId, fetch: fetchImpl = globalThis.fetch } = options;
+  const { botToken, chatId } = options;
 
   requireValue(botToken, 'TELEGRAM_BOT_TOKEN');
   requireValue(chatId, 'TELEGRAM_CHAT_ID');
-  requireFetch(fetchImpl);
+
+  const fetchImpl = createFetchWithProxy();
 
   return {
     sendTicket: (ticket) => sendTicket({ botToken, chatId, fetchImpl, ticket }),
@@ -26,13 +32,7 @@ async function sendTicket({ botToken, chatId, fetchImpl, ticket }) {
   console.log(`[Telegram] 代理配置: HTTP_PROXY=${process.env.HTTP_PROXY}, HTTPS_PROXY=${process.env.HTTPS_PROXY}`);
 
   try {
-    const dispatcher = getProxyAgent();
-    const options = buildRequest(chatId, ticket);
-    if (dispatcher) {
-      options.dispatcher = dispatcher;
-    }
-
-    const response = await fetchImpl(url, options);
+    const response = await fetchImpl(url, buildRequest(chatId, ticket));
     console.log(`[Telegram] 响应状态: ${response.status}`);
 
     if (!response.ok) {
