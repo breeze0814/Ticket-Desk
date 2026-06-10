@@ -40,9 +40,9 @@ async function handleSubmit({ form, status }) {
   try {
     await submitTicket(collectTicketPayload(new FormData(form)));
     form.reset();
-    showStatus(status, '工单已提交，Telegram 通知已发送。', 'success');
+    showStatus(status, '✅ 工单提交成功！团队已收到通知，我们会尽快与您联系。', 'success');
   } catch (error) {
-    showStatus(status, error.message, 'error');
+    showStatus(status, '❌ 提交失败：' + error.message, 'error');
   } finally {
     setSubmitting({ submitButton, status, isSubmitting: false });
   }
@@ -50,10 +50,13 @@ async function handleSubmit({ form, status }) {
 
 function setSubmitting({ submitButton, status, isSubmitting }) {
   submitButton.disabled = isSubmitting;
-  submitButton.textContent = isSubmitting ? '提交中...' : '提交工单';
+  const buttonText = submitButton.querySelector('span');
+  if (buttonText) {
+    buttonText.textContent = isSubmitting ? '提交中...' : '提交工单';
+  }
 
   if (isSubmitting) {
-    showStatus(status, '正在提交工单...', 'pending');
+    showStatus(status, '⏳ 正在提交工单，请稍候...', 'pending');
   }
 }
 
