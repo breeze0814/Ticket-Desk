@@ -10,7 +10,7 @@ const notifier = createTelegramNotifier({
 });
 
 const app = createApp({ notifier });
-const port = Number(process.env.PORT ?? DEFAULT_PORT);
+const port = DEFAULT_PORT;
 
 app.listen(port, () => {
   console.log(`工单系统已启动: http://localhost:${port}`);
