@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="提交技术工单并实时通知处理团队">
+    <meta name="theme-color" content="#0088cc">
+    <title>工单通知系统</title>
+    <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="/responsive.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="workspace" aria-labelledby="page-title">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Ticket Desk</p>
+            <h1 id="page-title">提交工单</h1>
+          </div>
+        </header>
+
+        <div class="content-grid">
+          <aside class="summary-panel" aria-label="使用指南">
+            <div class="notice-tip">
+              <span class="notice-icon">💡</span>
+              <p><strong>首次使用？</strong>看完下方说明再提交，可以更快得到帮助</p>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">✅ 提交前检查</span>
+              <strong>问题描述越详细越好</strong>
+              <p>包含：具体现象、出现时间、影响范围、已尝试的解决方法。</p>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">⏱️ 处理时效</span>
+              <strong>根据优先级响应</strong>
+              <p>紧急问题 1 小时内、高优先级 4 小时内、普通问题 24 小时内回复。</p>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">📱 后续跟进</span>
+              <strong>保持联系方式畅通</strong>
+              <p>我们会通过您留下的联系方式与您沟通处理进度和解决方案。</p>
+            </div>
+          </aside>
+
+          <form class="ticket-form" data-ticket-form>
+            <div class="field full">
+              <label for="title">问题标题 <span style="color: var(--accent-coral);">*</span> <span style="color: var(--text-tertiary); font-weight: 400; font-size: 0.85rem;">（一句话说明问题）</span></label>
+              <input id="title" name="title" type="text" placeholder="例如：无法登录后台管理系统" required aria-required="true">
+            </div>
+
+            <div class="field">
+              <label for="contact">联系方式 <span style="color: var(--accent-coral);">*</span></label>
+              <input id="contact" name="contact" type="text" placeholder="邮箱或手机号" required aria-required="true">
+            </div>
+
+            <div class="field">
+              <label for="category">工单类型 <span style="color: var(--accent-coral);">*</span></label>
+              <select id="category" name="category" required aria-required="true">
+                <option value="">请选择类型</option>
+                <option value="incident">🚨 故障告警</option>
+                <option value="account">👤 账号问题</option>
+                <option value="billing">💳 支付问题</option>
+                <option value="feature">💡 需求反馈</option>
+                <option value="other">📝 其他问题</option>
+              </select>
+            </div>
+
+            <fieldset class="priority-group full">
+              <legend>优先级（根据影响程度选择）</legend>
+              <label>
+                <input type="radio" name="priority" value="normal" checked>
+                <span>🟢 普通<small>不影响使用</small></span>
+              </label>
+              <label>
+                <input type="radio" name="priority" value="high">
+                <span>🟡 高<small>部分功能受限</small></span>
+              </label>
+              <label>
+                <input type="radio" name="priority" value="urgent">
+                <span>🔴 紧急<small>无法正常使用</small></span>
+              </label>
+            </fieldset>
+
+            <div class="field full">
+              <label for="description">详细描述 <span style="color: var(--accent-coral);">*</span> <span style="color: var(--text-tertiary); font-weight: 400; font-size: 0.85rem;">（越详细越容易解决）</span></label>
+              <textarea id="description" name="description" rows="8" placeholder="建议包含以下信息：&#10;1. 问题现象：具体发生了什么？&#10;2. 出现时间：什么时候开始的？&#10;3. 复现步骤：如何重现这个问题？&#10;4. 影响范围：有多少人/功能受影响？&#10;5. 期望结果：希望如何处理？" required aria-required="true"></textarea>
+            </div>
+
+            <div class="form-footer full">
+              <p data-submit-status class="submit-status" hidden></p>
+              <button type="submit">
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M3.4 20.4 21.1 12 3.4 3.6 3 10.2 14 12 3 13.8l.4 6.6Z"/>
+                </svg>
+                <span>提交工单</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

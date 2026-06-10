@@ -1,0 +1,203 @@
+/* Mobile-first responsive adjustments */
+
+@media (max-width: 960px) {
+  .content-grid {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  .summary-panel {
+    order: 2;
+  }
+
+  .ticket-form {
+    order: 1;
+  }
+}
+
+@media (max-width: 760px) {
+  .shell {
+    width: calc(100% - 24px);
+    padding: 20px 0;
+  }
+
+  .workspace {
+    min-height: calc(100vh - 40px);
+    padding: 28px 20px;
+    border-radius: 16px;
+  }
+
+  .workspace::before {
+    width: 400px;
+    height: 400px;
+    right: -40%;
+  }
+
+  .topbar {
+    align-items: flex-start;
+    flex-direction: column;
+    padding-bottom: 24px;
+  }
+
+  h1 {
+    font-size: clamp(1.75rem, 6vw, 2.5rem);
+  }
+
+  .route-badge {
+    width: 100%;
+    justify-content: center;
+    min-height: 48px;
+    padding: 0 20px;
+  }
+
+  .content-grid {
+    padding-top: 28px;
+    gap: 24px;
+  }
+
+  .ticket-form {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .form-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  button {
+    width: 100%;
+    min-height: 52px;
+  }
+
+  .summary-panel {
+    gap: 16px;
+  }
+
+  .summary-item {
+    padding: 20px;
+  }
+
+  .steps {
+    grid-template-columns: 36px 1fr 36px 1fr 36px;
+  }
+
+  .step {
+    width: 36px;
+    height: 36px;
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .workspace {
+    padding: 24px 16px;
+  }
+
+  .eyebrow {
+    font-size: 0.7rem;
+  }
+
+  h1 {
+    font-size: 1.75rem;
+  }
+
+  .route-badge {
+    font-size: 0.9rem;
+    gap: 10px;
+    min-height: 44px;
+  }
+
+  .route-badge svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .priority-group {
+    gap: 10px;
+  }
+
+  .priority-group span {
+    min-height: 40px;
+    padding: 0 16px;
+    font-size: 0.9rem;
+  }
+
+  input,
+  select {
+    height: 48px;
+    padding: 0 16px;
+  }
+
+  textarea {
+    min-height: 160px;
+    padding: 16px;
+  }
+
+  button {
+    min-height: 50px;
+    font-size: 0.95rem;
+    gap: 10px;
+  }
+
+  button svg {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+/* Reduce motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --border-soft: #000000;
+    --border-focus: #0000ff;
+  }
+
+  .workspace {
+    border-width: 2px;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    border-width: 2px;
+  }
+}
+
+/* Print styles */
+@media print {
+  body {
+    background: white;
+  }
+
+  .workspace {
+    box-shadow: none;
+    border: 1px solid #000;
+  }
+
+  .workspace::before {
+    display: none;
+  }
+
+  button,
+  .route-badge {
+    display: none;
+  }
+
+  .summary-panel {
+    break-inside: avoid;
+  }
+}
