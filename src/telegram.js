@@ -6,7 +6,7 @@ const TELEGRAM_API_BASE = 'https://api.telegram.org';
 function createFetchWithProxy() {
   const proxy = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
   if (!proxy) {
-    return globalThis.fetch;
+    return undiciFetch;
   }
 
   const dispatcher = new ProxyAgent(proxy);
@@ -14,12 +14,13 @@ function createFetchWithProxy() {
 }
 
 export function createTelegramNotifier(options = {}) {
-  const { botToken, chatId } = options;
+  const { botToken, chatId, fetch: customFetch } = options;
 
   requireValue(botToken, 'TELEGRAM_BOT_TOKEN');
   requireValue(chatId, 'TELEGRAM_CHAT_ID');
 
-  const fetchImpl = createFetchWithProxy();
+  // 优先使用传入的 fetch（测试用），否则使用带代理的 undici fetch
+  const fetchImpl = customFetch || createFetchWithProxy();
 
   return {
     sendTicket: (ticket) => sendTicket({ botToken, chatId, fetchImpl, ticket }),
@@ -38,6 +39,8 @@ async function sendTicket({ botToken, chatId, fetchImpl, ticket }) {
     if (!response.ok) {
       throw new Error(await buildTelegramError(response));
     }
+
+    console.log(`[Telegram] 通知发送成功`);
   } catch (error) {
     console.error(`[Telegram] 请求失败:`, error);
     throw error;
