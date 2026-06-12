@@ -6,6 +6,20 @@ const REQUIRED_FIELDS = [
   { key: 'description', label: '描述' },
 ];
 
+const CATEGORY_LABELS = {
+  incident: '🚨 故障告警',
+  account: '👤 账号问题',
+  billing: '💳 支付问题',
+  feature: '💡 需求反馈',
+  other: '📝 其他问题',
+};
+
+const PRIORITY_LABELS = {
+  normal: '🟢 普通',
+  high: '🟡 高',
+  urgent: '🔴 紧急',
+};
+
 export function validateTicketInput(input = {}) {
   const ticket = normalizeTicket(input);
   const missingField = REQUIRED_FIELDS.find(({ key }) => ticket[key] === '');
@@ -15,6 +29,22 @@ export function validateTicketInput(input = {}) {
       ok: false,
       status: 400,
       error: `${missingField.label}不能为空`,
+    };
+  }
+
+  if (!Object.hasOwn(CATEGORY_LABELS, ticket.category)) {
+    return {
+      ok: false,
+      status: 400,
+      error: '工单类型不支持',
+    };
+  }
+
+  if (!Object.hasOwn(PRIORITY_LABELS, ticket.priority)) {
+    return {
+      ok: false,
+      status: 400,
+      error: '优先级不支持',
     };
   }
 
@@ -32,20 +62,6 @@ export function formatTicketMessage(ticket) {
     hour12: false,
   });
 
-  const categoryEmoji = {
-    incident: '🚨 故障告警',
-    account: '👤 账号问题',
-    billing: '💳 支付问题',
-    feature: '💡 需求反馈',
-    other: '📝 其他问题',
-  };
-
-  const priorityEmoji = {
-    normal: '🟢 普通',
-    high: '🟡 高',
-    urgent: '🔴 紧急',
-  };
-
   return [
     '🎫 <b>新工单提交</b>',
     '━━━━━━━━━━━━━━━━━━',
@@ -56,8 +72,8 @@ export function formatTicketMessage(ticket) {
     '',
     '📋 <b>工单详情</b>',
     `📌 标题: <b>${escapeHtml(ticket.title)}</b>`,
-    `📂 类型: ${categoryEmoji[ticket.category] || ticket.category}`,
-    `⚠️ 优先级: ${priorityEmoji[ticket.priority] || ticket.priority}`,
+    `📂 类型: ${formatCategory(ticket.category)}`,
+    `⚠️ 优先级: ${formatPriority(ticket.priority)}`,
     '',
     '📝 <b>问题描述</b>',
     `<pre>${escapeHtml(ticket.description)}</pre>`,
@@ -67,9 +83,19 @@ export function formatTicketMessage(ticket) {
 }
 
 function normalizeTicket(input) {
+  const source = input ?? {};
+
   return Object.fromEntries(
-    REQUIRED_FIELDS.map(({ key }) => [key, String(input[key] ?? '').trim()]),
+    REQUIRED_FIELDS.map(({ key }) => [key, String(source[key] ?? '').trim()]),
   );
+}
+
+function formatCategory(category) {
+  return CATEGORY_LABELS[category] || escapeHtml(String(category ?? ''));
+}
+
+function formatPriority(priority) {
+  return PRIORITY_LABELS[priority] || escapeHtml(String(priority ?? ''));
 }
 
 function escapeHtml(text) {

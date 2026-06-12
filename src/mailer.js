@@ -64,12 +64,22 @@ export function createMailer(config) {
  * @returns {Object} Mailer instance
  */
 export function createMailerFromEnv() {
+  const port = parseInt(process.env.SMTP_PORT, 10);
+
   return createMailer({
     host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT, 10),
-    secure: process.env.SMTP_SECURE === 'true',
+    port,
+    secure: parseSmtpSecure(process.env.SMTP_SECURE, port),
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
     from: process.env.SMTP_FROM
   });
+}
+
+function parseSmtpSecure(value, port) {
+  if (value === undefined) {
+    return port === 465;
+  }
+
+  return value === 'true';
 }

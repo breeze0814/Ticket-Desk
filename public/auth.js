@@ -14,6 +14,10 @@ export async function sendVerificationCode(email) {
     throw new Error(result.error || '发送失败');
   }
 
+  if (!result.success) {
+    throw new Error(result.message || '发送失败');
+  }
+
   return result;
 }
 
@@ -28,6 +32,10 @@ export async function verifyCode(email, code) {
 
   if (!response.ok) {
     throw new Error(result.error || '验证失败');
+  }
+
+  if (!result.success) {
+    throw new Error(result.message || '验证失败');
   }
 
   // 存储 token 和 email
@@ -62,177 +70,206 @@ let currentEmail = '';
 let resendTimer = null;
 
 export function initAuthUI() {
-  const modal = document.querySelector('[data-auth-modal]');
-  const emailStep = document.querySelector('[data-email-step]');
-  const codeStep = document.querySelector('[data-code-step]');
-  const emailInput = document.querySelector('[data-auth-email]');
-  const codeInput = document.querySelector('[data-auth-code]');
-  const sendButton = document.querySelector('[data-send-code]');
-  const verifyButton = document.querySelector('[data-verify-code]');
-  const backButton = document.querySelector('[data-back-to-email]');
-  const resendButton = document.querySelector('[data-resend-code]');
-  const displayEmail = document.querySelector('[data-display-email]');
-  const countdown = document.querySelector('[data-countdown]');
-  const statusMsg = document.querySelector('[data-auth-status]');
+  const ui = getAuthElements(document);
 
   // 检查是否已登录
   if (isAuthenticated()) {
-    hideAuthModal();
-    showWelcome();
+    hideAuthModal(ui);
+    showWelcome(document);
     return;
   }
 
-  showAuthModal();
+  showAuthModal(ui);
+  bindAuthActions(ui);
+}
 
-  // 发送验证码
-  sendButton.addEventListener('click', async () => {
-    const email = emailInput.value.trim();
+function getAuthElements(documentRef) {
+  return {
+    modal: documentRef.querySelector('[data-auth-modal]'),
+    emailStep: documentRef.querySelector('[data-email-step]'),
+    codeStep: documentRef.querySelector('[data-code-step]'),
+    emailInput: documentRef.querySelector('[data-auth-email]'),
+    codeInput: documentRef.querySelector('[data-auth-code]'),
+    sendButton: documentRef.querySelector('[data-send-code]'),
+    verifyButton: documentRef.querySelector('[data-verify-code]'),
+    backButton: documentRef.querySelector('[data-back-to-email]'),
+    resendButton: documentRef.querySelector('[data-resend-code]'),
+    displayEmail: documentRef.querySelector('[data-display-email]'),
+    countdown: documentRef.querySelector('[data-countdown]'),
+    statusMsg: documentRef.querySelector('[data-auth-status]'),
+    documentRef,
+  };
+}
 
-    if (!validateEmail(email)) {
-      showStatus('请输入有效的邮箱地址', 'error');
+function bindAuthActions(ui) {
+  ui.sendButton.addEventListener('click', async () => {
+    await handleSendCodeClick(ui);
+  });
+
+  ui.verifyButton.addEventListener('click', async () => {
+    await handleVerifyCodeClick(ui);
+  });
+
+  ui.backButton.addEventListener('click', () => {
+    showEmailStep(ui);
+    ui.codeInput.value = '';
+    stopCountdown(ui);
+  });
+
+  ui.resendButton.addEventListener('click', async () => {
+    await handleResendCodeClick(ui);
+  });
+}
+
+async function handleSendCodeClick(ui) {
+  const email = ui.emailInput.value.trim();
+  if (!validateEmail(email)) {
+    showStatus(ui, '请输入有效的邮箱地址', 'error');
+    return;
+  }
+
+  setLoading(ui.sendButton, true);
+  try {
+    await sendVerificationCode(email);
+    currentEmail = email;
+    ui.displayEmail.textContent = email;
+    showCodeStep(ui);
+    startCountdown(ui);
+    showStatus(ui, '验证码已发送', 'success');
+  } catch (error) {
+    showStatus(ui, error.message, 'error');
+  } finally {
+    setLoading(ui.sendButton, false);
+  }
+}
+
+async function handleVerifyCodeClick(ui) {
+  const code = ui.codeInput.value.trim();
+  if (code.length !== 4 || !/^\d+$/.test(code)) {
+    showStatus(ui, '请输入4位数字验证码', 'error');
+    return;
+  }
+
+  setLoading(ui.verifyButton, true);
+  try {
+    await handleVerifySuccess(ui, code);
+  } catch (error) {
+    console.error('[Auth] 登录失败:', error);
+    showStatus(ui, error.message, 'error');
+  } finally {
+    setLoading(ui.verifyButton, false);
+  }
+}
+
+async function handleResendCodeClick(ui) {
+  setLoading(ui.resendButton, true);
+  try {
+    await sendVerificationCode(currentEmail);
+    startCountdown(ui);
+    showStatus(ui, '验证码已重新发送', 'success');
+  } catch (error) {
+    showStatus(ui, error.message, 'error');
+  } finally {
+    setLoading(ui.resendButton, false);
+  }
+}
+
+async function handleVerifySuccess(ui, code) {
+  const result = await verifyCode(currentEmail, code);
+  console.log('[Auth] 登录成功:', result);
+  showStatus(ui, '登录成功！', 'success');
+
+  // 延迟关闭弹窗，让用户看到成功消息
+  setTimeout(() => {
+    hideAuthModal(ui);
+    showWelcome(ui.documentRef);
+  }, 500);
+}
+
+function showEmailStep(ui) {
+  ui.emailStep.hidden = false;
+  ui.codeStep.hidden = true;
+}
+
+function showCodeStep(ui) {
+  ui.emailStep.hidden = true;
+  ui.codeStep.hidden = false;
+  ui.codeInput.focus();
+}
+
+function showAuthModal(ui) {
+  ui.modal.hidden = false;
+  ui.emailInput.focus();
+}
+
+function hideAuthModal(ui) {
+  ui.modal.hidden = true;
+}
+
+function showWelcome(documentRef) {
+  const email = getAuthEmail();
+  const welcome = documentRef.querySelector('[data-welcome-message]');
+  if (!welcome || !email) {
+    return;
+  }
+
+  welcome.textContent = `✅ 欢迎，${email}`;
+  welcome.hidden = false;
+  setTimeout(() => {
+    welcome.hidden = true;
+  }, 3000);
+}
+
+function startCountdown(ui) {
+  let seconds = 60;
+  ui.resendButton.disabled = true;
+  ui.countdown.textContent = `${seconds}s后重新发送`;
+
+  resendTimer = setInterval(() => {
+    seconds--;
+    if (seconds <= 0) {
+      stopCountdown(ui);
       return;
     }
 
-    setLoading(sendButton, true);
-    try {
-      await sendVerificationCode(email);
-      currentEmail = email;
-      displayEmail.textContent = email;
-      showCodeStep();
-      startCountdown();
-      showStatus('验证码已发送', 'success');
-    } catch (error) {
-      showStatus(error.message, 'error');
-    } finally {
-      setLoading(sendButton, false);
-    }
-  });
+    ui.countdown.textContent = `${seconds}s后重新发送`;
+  }, 1000);
+}
 
-  // 验证验证码
-  verifyButton.addEventListener('click', async () => {
-    const code = codeInput.value.trim();
+function stopCountdown(ui) {
+  if (resendTimer) {
+    clearInterval(resendTimer);
+    resendTimer = null;
+  }
+  ui.resendButton.disabled = false;
+  ui.countdown.textContent = '重新发送';
+}
 
-    if (code.length !== 4 || !/^\d+$/.test(code)) {
-      showStatus('请输入4位数字验证码', 'error');
-      return;
-    }
+function showStatus(ui, message, type) {
+  ui.statusMsg.textContent = message;
+  ui.statusMsg.dataset.state = type;
+  ui.statusMsg.hidden = false;
 
-    setLoading(verifyButton, true);
-    try {
-      const result = await verifyCode(currentEmail, code);
-      console.log('[Auth] 登录成功:', result);
-      showStatus('登录成功！', 'success');
+  setTimeout(() => {
+    ui.statusMsg.hidden = true;
+  }, 3000);
+}
 
-      // 延迟关闭弹窗，让用户看到成功消息
-      setTimeout(() => {
-        hideAuthModal();
-        showWelcome();
-      }, 500);
-    } catch (error) {
-      console.error('[Auth] 登录失败:', error);
-      showStatus(error.message, 'error');
-    } finally {
-      setLoading(verifyButton, false);
-    }
-  });
-
-  // 返回邮箱输入
-  backButton.addEventListener('click', () => {
-    showEmailStep();
-    codeInput.value = '';
-    stopCountdown();
-  });
-
-  // 重新发送
-  resendButton.addEventListener('click', async () => {
-    setLoading(resendButton, true);
-    try {
-      await sendVerificationCode(currentEmail);
-      startCountdown();
-      showStatus('验证码已重新发送', 'success');
-    } catch (error) {
-      showStatus(error.message, 'error');
-    } finally {
-      setLoading(resendButton, false);
-    }
-  });
-
-  function showEmailStep() {
-    emailStep.hidden = false;
-    codeStep.hidden = true;
+function setLoading(button, loading) {
+  button.disabled = loading;
+  const text = button.querySelector('span');
+  if (!text) {
+    return;
   }
 
-  function showCodeStep() {
-    emailStep.hidden = true;
-    codeStep.hidden = false;
-    codeInput.focus();
+  if (loading) {
+    button.dataset.originalText = text.textContent;
+    text.textContent = '处理中...';
+    return;
   }
 
-  function showAuthModal() {
-    modal.hidden = false;
-    emailInput.focus();
-  }
-
-  function hideAuthModal() {
-    modal.hidden = true;
-  }
-
-  function showWelcome() {
-    const email = getAuthEmail();
-    const welcome = document.querySelector('[data-welcome-message]');
-    if (welcome && email) {
-      welcome.textContent = `✅ 欢迎，${email}`;
-      welcome.hidden = false;
-      setTimeout(() => {
-        welcome.hidden = true;
-      }, 3000);
-    }
-  }
-
-  function startCountdown() {
-    let seconds = 60;
-    resendButton.disabled = true;
-    countdown.textContent = `${seconds}s后重新发送`;
-
-    resendTimer = setInterval(() => {
-      seconds--;
-      if (seconds <= 0) {
-        stopCountdown();
-      } else {
-        countdown.textContent = `${seconds}s后重新发送`;
-      }
-    }, 1000);
-  }
-
-  function stopCountdown() {
-    if (resendTimer) {
-      clearInterval(resendTimer);
-      resendTimer = null;
-    }
-    resendButton.disabled = false;
-    countdown.textContent = '重新发送';
-  }
-
-  function showStatus(message, type) {
-    statusMsg.textContent = message;
-    statusMsg.dataset.state = type;
-    statusMsg.hidden = false;
-
-    setTimeout(() => {
-      statusMsg.hidden = true;
-    }, 3000);
-  }
-
-  function setLoading(button, loading) {
-    button.disabled = loading;
-    const text = button.querySelector('span');
-    if (text) {
-      if (!loading && !button.dataset.originalText) {
-        button.dataset.originalText = text.textContent;
-      }
-      text.textContent = loading ? '处理中...' : (button.dataset.originalText || text.textContent);
-    }
-  }
+  text.textContent = button.dataset.originalText || text.textContent;
+  delete button.dataset.originalText;
 }
 
 // 页面加载时初始化

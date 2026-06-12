@@ -89,6 +89,24 @@ describe('formatTicketMessage', () => {
     expect(message).toContain('&amp;');
     expect(message).toContain('&lt;tag&gt;');
   });
+
+  it('escapes unknown category and priority fallback values', () => {
+    const ticket = {
+      title: 'Test',
+      contact: '123',
+      category: '<b>custom</b>',
+      priority: '<script>alert(1)</script>',
+      description: 'Test',
+      userEmail: 'test@test.com',
+    };
+
+    const message = formatTicketMessage(ticket);
+
+    expect(message).not.toContain('<b>custom</b>');
+    expect(message).not.toContain('<script>alert(1)</script>');
+    expect(message).toContain('&lt;b&gt;custom&lt;/b&gt;');
+    expect(message).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+  });
 });
 
 describe('validateTicketInput', () => {
@@ -111,6 +129,14 @@ describe('validateTicketInput', () => {
     const result = validateTicketInput({ title: '' });
     expect(result.ok).toBe(false);
     expect(result.error).toContain('标题');
+  });
+
+  it('rejects null input without throwing', () => {
+    const result = validateTicketInput(null);
+
+    expect(result.ok).toBe(false);
+    expect(result.status).toBe(400);
+    expect(result.error).toBe('标题不能为空');
   });
 
   it('rejects when contact is missing', () => {
@@ -137,5 +163,33 @@ describe('validateTicketInput', () => {
     expect(result.ok).toBe(true);
     expect(result.ticket.title).toBe('测试');
     expect(result.ticket.contact).toBe('123');
+  });
+
+  it('rejects unsupported category values', () => {
+    const result = validateTicketInput({
+      title: '测试',
+      contact: '123',
+      category: 'unsupported',
+      priority: 'normal',
+      description: '描述',
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.status).toBe(400);
+    expect(result.error).toBe('工单类型不支持');
+  });
+
+  it('rejects unsupported priority values', () => {
+    const result = validateTicketInput({
+      title: '测试',
+      contact: '123',
+      category: 'other',
+      priority: 'critical',
+      description: '描述',
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.status).toBe(400);
+    expect(result.error).toBe('优先级不支持');
   });
 });

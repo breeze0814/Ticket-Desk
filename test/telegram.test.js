@@ -43,6 +43,47 @@ describe('createTelegramNotifier', () => {
     );
   });
 
+  test('does not log the bot token when sending ticket message', async () => {
+    const fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ ok: true }),
+    });
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const notifier = createTelegramNotifier({
+      botToken: 'secret-token',
+      chatId: '456',
+      fetch,
+    });
+
+    await notifier.sendTicket(ticket);
+
+    expect(logSpy.mock.calls.flat().join('\n')).not.toContain('secret-token');
+    logSpy.mockRestore();
+  });
+
+  test('does not log proxy credentials when sending ticket message', async () => {
+    const previousProxy = process.env.HTTPS_PROXY;
+    process.env.HTTPS_PROXY = 'http://user:secret-password@proxy.example.com:8080';
+    const fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ ok: true }),
+    });
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const notifier = createTelegramNotifier({
+      botToken: '123:abc',
+      chatId: '456',
+      fetch,
+    });
+
+    try {
+      await notifier.sendTicket(ticket);
+      expect(logSpy.mock.calls.flat().join('\n')).not.toContain('secret-password');
+    } finally {
+      process.env.HTTPS_PROXY = previousProxy;
+      logSpy.mockRestore();
+    }
+  });
+
   test('raises an explicit error when Telegram rejects the request', async () => {
     const fetch = vi.fn().mockResolvedValue({
       ok: false,

@@ -59,6 +59,20 @@ describe('Authentication API', () => {
       expect(response.body.error).toContain('邮箱格式不正确');
     });
 
+    test('returns 400 when auth service reports validation failure', async () => {
+      mockAuthService.sendVerificationCode.mockResolvedValue({
+        success: false,
+        message: '无效的邮箱地址',
+      });
+
+      const response = await request(app)
+        .post('/api/auth/send-code')
+        .send({ email: 'invalid-email' });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: '无效的邮箱地址' });
+    });
+
     test('returns 429 for rate limit', async () => {
       mockAuthService.sendVerificationCode.mockRejectedValue(
         new Error('请 60 秒后再试')
@@ -70,6 +84,20 @@ describe('Authentication API', () => {
 
       expect(response.status).toBe(429);
       expect(response.body.error).toContain('秒后再试');
+    });
+
+    test('returns 429 when auth service reports rate limiting', async () => {
+      mockAuthService.sendVerificationCode.mockResolvedValue({
+        success: false,
+        message: '验证码发送过于频繁，请稍后再试',
+      });
+
+      const response = await request(app)
+        .post('/api/auth/send-code')
+        .send({ email: 'rate@example.com' });
+
+      expect(response.status).toBe(429);
+      expect(response.body.error).toContain('频繁');
     });
   });
 
@@ -181,6 +209,29 @@ describe('POST /api/tickets', () => {
 
     expect(response.status).toBe(401);
     expect(response.body.error).toContain('未登录');
+  });
+
+  test('keeps ticket rate limits isolated between app instances', async () => {
+    const ip = '203.0.113.10';
+
+    for (let count = 0; count < 3; count++) {
+      const response = await request(app)
+        .post('/api/tickets')
+        .set('Authorization', 'Bearer valid-token')
+        .set('X-Forwarded-For', ip)
+        .send(validTicket);
+
+      expect(response.status).toBe(201);
+    }
+
+    const otherApp = createApp({ notifier: mockNotifier, authService: mockAuthService });
+    const response = await request(otherApp)
+      .post('/api/tickets')
+      .set('Authorization', 'Bearer valid-token')
+      .set('X-Forwarded-For', ip)
+      .send(validTicket);
+
+    expect(response.status).toBe(201);
   });
 });
 

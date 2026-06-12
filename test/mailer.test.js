@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import nodemailer from 'nodemailer';
 import { createMailer, createMailerFromEnv } from '../src/mailer.js';
 
 describe('Mailer', () => {
@@ -88,6 +89,24 @@ describe('Mailer', () => {
 
       expect(mailer).toBeDefined();
       expect(mailer.sendVerificationCode).toBeInstanceOf(Function);
+    });
+
+    it('uses TLS by default for SMTP port 465 when SMTP_SECURE is unset', () => {
+      const createTransport = vi.spyOn(nodemailer, 'createTransport')
+        .mockReturnValue({ sendMail: vi.fn() });
+
+      process.env.SMTP_HOST = 'smtp.example.com';
+      process.env.SMTP_PORT = '465';
+      process.env.SMTP_USER = 'test@example.com';
+      process.env.SMTP_PASS = 'password';
+      process.env.SMTP_FROM = 'noreply@example.com';
+
+      createMailerFromEnv();
+
+      expect(createTransport).toHaveBeenCalledWith(
+        expect.objectContaining({ secure: true }),
+      );
+      createTransport.mockRestore();
     });
 
     it('throws error when environment variables are missing', () => {

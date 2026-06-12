@@ -98,6 +98,21 @@ describe('Authentication Service - Verification Code Generation', () => {
       expect(parseInt(code)).toBeLessThan(10000);
     });
 
+    it('should normalize email before storing and sending verification code', async () => {
+      await authService.sendVerificationCode('  USER@Example.COM  ');
+      const [, code] = mockMailer.sendVerificationCode.mock.calls[0];
+
+      await expect(authService.verifyCode('user@example.com', code))
+        .resolves.toMatchObject({
+          success: true,
+          email: 'user@example.com',
+        });
+      expect(mockMailer.sendVerificationCode).toHaveBeenCalledWith(
+        'user@example.com',
+        code,
+      );
+    });
+
     it('should reject invalid email addresses', async () => {
       const invalidEmails = ['', 'invalid', 'test@', '@example.com', 'test @example.com'];
 
@@ -133,6 +148,21 @@ describe('Authentication Service - Verification Code Generation', () => {
       const result4 = await authService.sendVerificationCode(testEmail);
       expect(result4.success).toBe(true);
       expect(mockMailer.sendVerificationCode).toHaveBeenCalledTimes(2);
+    });
+
+    it('should isolate verification codes between service instances', async () => {
+      await authService.sendVerificationCode(testEmail);
+      const [, code] = mockMailer.sendVerificationCode.mock.calls[0];
+      const otherService = createAuthService({
+        mailer: mockMailer,
+        jwtSecret,
+        jwtExpiresIn
+      });
+
+      await expect(otherService.verifyCode(testEmail, code))
+        .rejects.toThrow('验证码错误或已过期');
+
+      otherService.stopCleanup();
     });
   });
 

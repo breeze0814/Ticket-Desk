@@ -44,6 +44,12 @@ docker-compose down
 
 ## 环境变量
 
+### 服务端口
+
+应用内部固定监听 `3000`。Docker Compose 使用 `.env` 中的 `PORT`
+作为宿主机映射端口，例如 `PORT=30022` 时访问
+`http://localhost:30022`，容器内部仍监听 `3000`。
+
 ### Telegram 配置
 
 ```env

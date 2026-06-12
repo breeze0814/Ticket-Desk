@@ -1,9 +1,6 @@
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 
-// Module-level storage for verification codes
-const verificationCodes = new Map();
-
 // Email validation regex
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -28,159 +25,161 @@ export function createAuthService(config) {
     throw new Error('认证服务配置不完整或 JWT 密钥过短');
   }
 
-  // Cleanup interval for expired codes
-  const cleanupInterval = setInterval(() => {
-    const now = Date.now();
-    for (const [email, data] of verificationCodes.entries()) {
-      if (data.expiresAt < now) {
-        verificationCodes.delete(email);
-      }
-    }
-  }, CLEANUP_INTERVAL_MS);
+  const verificationCodes = new Map();
+  const context = {
+    jwtExpiresIn,
+    jwtSecret,
+    mailer,
+    verificationCodes,
+  };
+  const cleanupInterval = setInterval(
+    () => deleteExpiredCodes(verificationCodes),
+    CLEANUP_INTERVAL_MS,
+  );
 
   // Allow cleanup to be stopped (useful for testing)
   const stopCleanup = () => clearInterval(cleanupInterval);
 
-  /**
-   * Validates email format
-   * @param {string} email
-   * @returns {boolean}
-   */
-  function isValidEmail(email) {
-    return typeof email === 'string' && EMAIL_REGEX.test(email);
-  }
-
-  /**
-   * Sends a verification code to the given email
-   * @param {string} email
-   * @returns {Promise<Object>} { success: boolean, message: string }
-   */
-  async function sendVerificationCode(email) {
-    // Validate email
-    if (!isValidEmail(email)) {
-      return {
-        success: false,
-        message: '无效的邮箱地址'
-      };
-    }
-
-    const now = Date.now();
-
-    // Check rate limiting
-    const existingCode = verificationCodes.get(email);
-    if (existingCode && existingCode.sentAt + RATE_LIMIT_MS > now) {
-      return {
-        success: false,
-        message: '验证码发送过于频繁，请稍后再试'
-      };
-    }
-
-    // Generate 4-digit verification code
-    const code = crypto.randomInt(1000, 10000).toString();
-
-    // Store code with metadata
-    verificationCodes.set(email, {
-      code,
-      expiresAt: now + CODE_EXPIRY_MS,
-      sentAt: now,
-      attempts: 0
-    });
-
-    // Send email
-    try {
-      await mailer.sendVerificationCode(email, code);
-
-      return {
-        success: true,
-        message: '验证码已发送'
-      };
-    } catch (error) {
-      // Remove stored code if email fails
-      verificationCodes.delete(email);
-      console.error('[Auth] 邮件发送失败:', error.message);
-      throw new Error(`邮件发送失败: ${error.message}`);
-    }
-  }
-
-  /**
-   * Verifies a code for the given email
-   * @param {string} email
-   * @param {string} code
-   * @returns {Promise<Object>} { success: true, token: string, email: string }
-   * @throws {Error} If verification fails
-   */
-  async function verifyCode(email, code) {
-    // Get the stored code data
-    const codeData = verificationCodes.get(email);
-
-    // Check if code exists
-    if (!codeData) {
-      throw new Error('验证码错误或已过期');
-    }
-
-    // Check if code has expired
-    const now = Date.now();
-    if (codeData.expiresAt < now) {
-      verificationCodes.delete(email);
-      throw new Error('验证码错误或已过期');
-    }
-
-    // Check if max attempts already exceeded
-    if (codeData.attempts >= MAX_VERIFY_ATTEMPTS) {
-      verificationCodes.delete(email);
-      throw new Error('验证次数过多，请重新发送验证码');
-    }
-
-    // Check if code matches
-    if (codeData.code !== code) {
-      codeData.attempts += 1;
-
-      // Check if max attempts reached after increment
-      if (codeData.attempts >= MAX_VERIFY_ATTEMPTS) {
-        verificationCodes.delete(email);
-        throw new Error('验证次数过多，请重新发送验证码');
-      }
-
-      throw new Error('验证码错误或已过期');
-    }
-
-    // Code is correct - delete it and generate JWT token
-    verificationCodes.delete(email);
-
-    const token = jwt.sign(
-      { email },
-      jwtSecret,
-      { expiresIn: jwtExpiresIn }
-    );
-
-    return {
-      success: true,
-      token,
-      email
-    };
-  }
-
-  /**
-   * Verifies a JWT token
-   * @param {string} token
-   * @returns {Object} Payload if valid
-   * @throws {Error} If token is invalid or expired
-   */
-  function verifyToken(token) {
-    try {
-      return jwt.verify(token, jwtSecret);
-    } catch (error) {
-      throw new Error('Token 无效或已过期');
-    }
-  }
-
   return {
-    sendVerificationCode,
-    verifyCode,
-    verifyToken,
+    sendVerificationCode: (email) => sendVerificationCode(context, email),
+    verifyCode: (email, code) => verifyCode(context, { email, code }),
+    verifyToken: (token) => verifyToken(jwtSecret, token),
     stopCleanup, // Exposed for testing cleanup
     clearCodes: () => verificationCodes.clear() // Exposed for testing
   };
+}
+
+async function sendVerificationCode(context, email) {
+  const normalizedEmail = normalizeEmail(email);
+
+  if (!isValidEmail(normalizedEmail)) {
+    return {
+      success: false,
+      message: '无效的邮箱地址'
+    };
+  }
+
+  const rateLimit = checkCodeRateLimit(context.verificationCodes, normalizedEmail);
+  if (!rateLimit.allowed) {
+    return {
+      success: false,
+      message: '验证码发送过于频繁，请稍后再试'
+    };
+  }
+
+  const code = crypto.randomInt(1000, 10000).toString();
+  storeVerificationCode(context.verificationCodes, { code, email: normalizedEmail });
+  await sendCodeEmail(context, { code, email: normalizedEmail });
+
+  return {
+    success: true,
+    message: '验证码已发送'
+  };
+}
+
+async function verifyCode(context, params) {
+  const normalizedEmail = normalizeEmail(params.email);
+  const codeData = getActiveCode(context.verificationCodes, normalizedEmail);
+
+  if (codeData.code !== params.code) {
+    recordFailedAttempt(context.verificationCodes, normalizedEmail, codeData);
+    throw new Error('验证码错误或已过期');
+  }
+
+  context.verificationCodes.delete(normalizedEmail);
+  const token = jwt.sign(
+    { email: normalizedEmail },
+    context.jwtSecret,
+    { expiresIn: context.jwtExpiresIn }
+  );
+
+  return {
+    success: true,
+    token,
+    email: normalizedEmail
+  };
+}
+
+function deleteExpiredCodes(verificationCodes) {
+  const now = Date.now();
+
+  for (const [email, data] of verificationCodes.entries()) {
+    if (data.expiresAt < now) {
+      verificationCodes.delete(email);
+    }
+  }
+}
+
+function isValidEmail(email) {
+  return EMAIL_REGEX.test(email);
+}
+
+function checkCodeRateLimit(verificationCodes, email) {
+  const existingCode = verificationCodes.get(email);
+  const allowed = !existingCode || existingCode.sentAt + RATE_LIMIT_MS <= Date.now();
+  return { allowed };
+}
+
+function storeVerificationCode(verificationCodes, params) {
+  verificationCodes.set(params.email, {
+    code: params.code,
+    expiresAt: Date.now() + CODE_EXPIRY_MS,
+    sentAt: Date.now(),
+    attempts: 0
+  });
+}
+
+async function sendCodeEmail(context, params) {
+  try {
+    await context.mailer.sendVerificationCode(params.email, params.code);
+  } catch (error) {
+    context.verificationCodes.delete(params.email);
+    console.error('[Auth] 邮件发送失败:', error.message);
+    throw new Error(`邮件发送失败: ${error.message}`);
+  }
+}
+
+function getActiveCode(verificationCodes, email) {
+  const codeData = verificationCodes.get(email);
+
+  if (!codeData) {
+    throw new Error('验证码错误或已过期');
+  }
+
+  if (codeData.expiresAt < Date.now()) {
+    verificationCodes.delete(email);
+    throw new Error('验证码错误或已过期');
+  }
+
+  if (codeData.attempts >= MAX_VERIFY_ATTEMPTS) {
+    verificationCodes.delete(email);
+    throw new Error('验证次数过多，请重新发送验证码');
+  }
+
+  return codeData;
+}
+
+function recordFailedAttempt(verificationCodes, email, codeData) {
+  const attempts = codeData.attempts + 1;
+
+  if (attempts >= MAX_VERIFY_ATTEMPTS) {
+    verificationCodes.delete(email);
+    throw new Error('验证次数过多，请重新发送验证码');
+  }
+
+  verificationCodes.set(email, { ...codeData, attempts });
+}
+
+function verifyToken(jwtSecret, token) {
+  try {
+    return jwt.verify(token, jwtSecret);
+  } catch (error) {
+    throw new Error('Token 无效或已过期');
+  }
+}
+
+function normalizeEmail(email) {
+  return String(email ?? '').trim().toLowerCase();
 }
 
 /**

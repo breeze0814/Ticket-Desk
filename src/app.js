@@ -10,19 +10,9 @@ const STATIC_ROOT = path.join(
   'public',
 );
 
-const rateLimitStore = new Map();
 const RATE_LIMIT_WINDOW_MS = 60000; // 1分钟
 const MAX_REQUESTS_PER_WINDOW = 3; // 每分钟最多3次
-
-// 每5分钟清理过期记录
-setInterval(() => {
-  const now = Date.now();
-  for (const [ip, record] of rateLimitStore.entries()) {
-    if (now > record.resetAt) {
-      rateLimitStore.delete(ip);
-    }
-  }
-}, 300000);
+const RATE_LIMIT_CLEANUP_MS = 300000; // 5分钟
 
 function getClientIp(request) {
   return request.headers['x-forwarded-for']?.split(',')[0].trim()
@@ -30,17 +20,37 @@ function getClientIp(request) {
     || request.socket.remoteAddress;
 }
 
-function checkRateLimit(ip) {
+function createRateLimiter() {
+  const records = new Map();
+  const cleanupInterval = setInterval(() => cleanupRateLimitRecords(records), RATE_LIMIT_CLEANUP_MS);
+
+  return {
+    check: (ip) => checkRateLimit(records, ip),
+    stop: () => clearInterval(cleanupInterval),
+  };
+}
+
+function cleanupRateLimitRecords(records) {
   const now = Date.now();
-  const record = rateLimitStore.get(ip);
+
+  for (const [ip, record] of records.entries()) {
+    if (now > record.resetAt) {
+      records.delete(ip);
+    }
+  }
+}
+
+function checkRateLimit(records, ip) {
+  const now = Date.now();
+  const record = records.get(ip);
 
   if (!record) {
-    rateLimitStore.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    records.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
     return { allowed: true };
   }
 
   if (now > record.resetAt) {
-    rateLimitStore.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    records.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
     return { allowed: true };
   }
 
@@ -49,12 +59,13 @@ function checkRateLimit(ip) {
     return { allowed: false, remainingSeconds };
   }
 
-  record.count++;
+  records.set(ip, { ...record, count: record.count + 1 });
   return { allowed: true };
 }
 
 export function createApp({ notifier, authService }) {
   const app = express();
+  const rateLimiter = createRateLimiter();
 
   app.use(express.json());
   app.use(express.static(STATIC_ROOT));
@@ -71,9 +82,10 @@ export function createApp({ notifier, authService }) {
   // 工单端点（需要认证）
   const authMiddleware = createAuthMiddleware(authService);
   app.post('/api/tickets', authMiddleware, (request, response) => {
-    handleCreateTicket({ request, notifier, response });
+    handleCreateTicket({ request, notifier, response, rateLimiter });
   });
 
+  app.locals.stopRateLimiter = rateLimiter.stop;
   return app;
 }
 
@@ -82,6 +94,12 @@ async function handleSendCode({ request, authService, response }) {
 
   try {
     const result = await authService.sendVerificationCode(email);
+    if (!result.success) {
+      const status = result.message.includes('频繁') ? 429 : 400;
+      response.status(status).json({ error: result.message });
+      return;
+    }
+
     response.status(200).json(result);
   } catch (error) {
     const status = error.message.includes('秒后再试') ? 429 : 400;
@@ -100,11 +118,11 @@ async function handleVerifyCode({ request, authService, response }) {
   }
 }
 
-async function handleCreateTicket({ request, notifier, response }) {
+async function handleCreateTicket({ request, notifier, response, rateLimiter }) {
   const clientIp = getClientIp(request);
   console.log(`[${new Date().toISOString()}] 收到工单提交请求，IP: ${clientIp}`);
 
-  const rateLimit = checkRateLimit(clientIp);
+  const rateLimit = rateLimiter.check(clientIp);
 
   if (!rateLimit.allowed) {
     console.log(`[${new Date().toISOString()}] IP ${clientIp} 超出频率限制`);

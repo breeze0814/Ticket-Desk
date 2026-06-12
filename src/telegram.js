@@ -29,8 +29,8 @@ export function createTelegramNotifier(options = {}) {
 
 async function sendTicket({ botToken, chatId, fetchImpl, ticket }) {
   const url = `${TELEGRAM_API_BASE}/bot${botToken}/sendMessage`;
-  console.log(`[Telegram] 请求 URL: ${url}`);
-  console.log(`[Telegram] 代理配置: HTTP_PROXY=${process.env.HTTP_PROXY}, HTTPS_PROXY=${process.env.HTTPS_PROXY}`);
+  console.log(`[Telegram] 请求 URL: ${TELEGRAM_API_BASE}/bot<redacted>/sendMessage`);
+  console.log(`[Telegram] 代理配置: HTTP_PROXY=${redactProxy(process.env.HTTP_PROXY)}, HTTPS_PROXY=${redactProxy(process.env.HTTPS_PROXY)}`);
 
   try {
     const response = await fetchImpl(url, buildRequest(chatId, ticket));
@@ -68,4 +68,12 @@ function requireValue(value, envName) {
   if (!String(value ?? '').trim()) {
     throw new Error(`缺少 ${envName}`);
   }
+}
+
+function redactProxy(proxy) {
+  if (!proxy) {
+    return 'undefined';
+  }
+
+  return String(proxy).replace(/\/\/[^/@]+@/, '//<redacted>@');
 }
