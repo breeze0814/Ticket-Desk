@@ -54,6 +54,7 @@ function buildRequest(chatId, ticket) {
     body: JSON.stringify({
       chat_id: chatId,
       text: formatTicketMessage(ticket),
+      parse_mode: 'HTML',
     }),
   };
 }
