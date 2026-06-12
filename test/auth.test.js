@@ -141,4 +141,99 @@ describe('Authentication Service - Verification Code Generation', () => {
       expect(mockMailer.sendMail).toHaveBeenCalledTimes(2);
     });
   });
+
+  describe('verifyCode', () => {
+    it('should verify correct code and return JWT token', async () => {
+      // Send verification code first
+      await authService.sendVerificationCode(testEmail);
+
+      // Extract the code from the email
+      const mailOptions = mockMailer.sendMail.mock.calls[0][0];
+      const codeMatch = mailOptions.html.match(/(\d{4})/);
+      const code = codeMatch[1];
+
+      // Verify the code
+      const result = await authService.verifyCode(testEmail, code);
+
+      expect(result.success).toBe(true);
+      expect(result.token).toBeDefined();
+      expect(typeof result.token).toBe('string');
+      expect(result.email).toBe(testEmail);
+    });
+
+    it('should reject incorrect verification code', async () => {
+      // Send verification code first
+      await authService.sendVerificationCode(testEmail);
+
+      // Try to verify with wrong code
+      await expect(authService.verifyCode(testEmail, '9999'))
+        .rejects.toThrow('验证码错误或已过期');
+    });
+
+    it('should reject expired verification code', async () => {
+      // Send verification code
+      await authService.sendVerificationCode(testEmail);
+
+      // Extract the code
+      const mailOptions = mockMailer.sendMail.mock.calls[0][0];
+      const codeMatch = mailOptions.html.match(/(\d{4})/);
+      const code = codeMatch[1];
+
+      // Advance time past expiry (3 minutes)
+      vi.advanceTimersByTime(3 * 60 * 1000 + 1000);
+
+      // Try to verify expired code
+      await expect(authService.verifyCode(testEmail, code))
+        .rejects.toThrow('验证码错误或已过期');
+    });
+
+    it('should enforce max attempts limit (3 attempts)', async () => {
+      // Send verification code
+      await authService.sendVerificationCode(testEmail);
+
+      // Try 3 times with wrong code
+      await expect(authService.verifyCode(testEmail, '9999'))
+        .rejects.toThrow('验证码错误或已过期');
+
+      await expect(authService.verifyCode(testEmail, '8888'))
+        .rejects.toThrow('验证码错误或已过期');
+
+      await expect(authService.verifyCode(testEmail, '7777'))
+        .rejects.toThrow('验证次数过多，请重新发送验证码');
+
+      // Extract the correct code
+      const mailOptions = mockMailer.sendMail.mock.calls[0][0];
+      const codeMatch = mailOptions.html.match(/(\d{4})/);
+      const correctCode = codeMatch[1];
+
+      // Fourth attempt should fail even with correct code (code was deleted after max attempts)
+      await expect(authService.verifyCode(testEmail, correctCode))
+        .rejects.toThrow('验证码错误或已过期');
+    });
+  });
+
+  describe('verifyToken', () => {
+    it('should verify valid JWT token', async () => {
+      // Send and verify code to get a token
+      await authService.sendVerificationCode(testEmail);
+      const mailOptions = mockMailer.sendMail.mock.calls[0][0];
+      const codeMatch = mailOptions.html.match(/(\d{4})/);
+      const code = codeMatch[1];
+
+      const verifyResult = await authService.verifyCode(testEmail, code);
+      const token = verifyResult.token;
+
+      // Verify the token
+      const payload = authService.verifyToken(token);
+
+      expect(payload).toBeDefined();
+      expect(payload.email).toBe(testEmail);
+    });
+
+    it('should reject invalid JWT token', () => {
+      const invalidToken = 'invalid.token.string';
+
+      expect(() => authService.verifyToken(invalidToken)).toThrow('Token 无效或已过期');
+    });
+  });
 });

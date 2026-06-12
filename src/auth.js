@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 
 // Module-level storage for verification codes
 const verificationCodes = new Map();
@@ -10,6 +11,7 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const CODE_EXPIRY_MS = 3 * 60 * 1000; // 3 minutes
 const RATE_LIMIT_MS = 60 * 1000; // 1 minute
 const CLEANUP_INTERVAL_MS = 60 * 1000; // 1 minute
+const MAX_VERIFY_ATTEMPTS = 3; // Maximum verification attempts
 
 /**
  * Creates an authentication service
@@ -118,27 +120,72 @@ export function createAuthService(config) {
    * Verifies a code for the given email
    * @param {string} email
    * @param {string} code
-   * @returns {Promise<Object>} { success: boolean, message: string, token?: string }
+   * @returns {Promise<Object>} { success: true, token: string, email: string }
+   * @throws {Error} If verification fails
    */
   async function verifyCode(email, code) {
-    // Placeholder for Part 2
+    // Get the stored code data
+    const codeData = verificationCodes.get(email);
+
+    // Check if code exists
+    if (!codeData) {
+      throw new Error('验证码错误或已过期');
+    }
+
+    // Check if code has expired
+    const now = Date.now();
+    if (codeData.expiresAt < now) {
+      verificationCodes.delete(email);
+      throw new Error('验证码错误或已过期');
+    }
+
+    // Check if max attempts already exceeded
+    if (codeData.attempts >= MAX_VERIFY_ATTEMPTS) {
+      verificationCodes.delete(email);
+      throw new Error('验证次数过多，请重新发送验证码');
+    }
+
+    // Check if code matches
+    if (codeData.code !== code) {
+      codeData.attempts += 1;
+
+      // Check if max attempts reached after increment
+      if (codeData.attempts >= MAX_VERIFY_ATTEMPTS) {
+        verificationCodes.delete(email);
+        throw new Error('验证次数过多，请重新发送验证码');
+      }
+
+      throw new Error('验证码错误或已过期');
+    }
+
+    // Code is correct - delete it and generate JWT token
+    verificationCodes.delete(email);
+
+    const token = jwt.sign(
+      { email },
+      jwtSecret,
+      { expiresIn: jwtExpiresIn }
+    );
+
     return {
-      success: false,
-      message: 'Not implemented yet'
+      success: true,
+      token,
+      email
     };
   }
 
   /**
    * Verifies a JWT token
    * @param {string} token
-   * @returns {Object} { valid: boolean, payload?: Object, error?: string }
+   * @returns {Object} Payload if valid
+   * @throws {Error} If token is invalid or expired
    */
   function verifyToken(token) {
-    // Placeholder for Part 2
-    return {
-      valid: false,
-      error: 'Not implemented yet'
-    };
+    try {
+      return jwt.verify(token, jwtSecret);
+    } catch (error) {
+      throw new Error('Token 无效或已过期');
+    }
   }
 
   return {
