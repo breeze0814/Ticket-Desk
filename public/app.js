@@ -1,3 +1,5 @@
+import { getAuthToken, clearAuth } from './auth.js';
+
 const API_ENDPOINT = '/api/tickets';
 const TICKET_FIELDS = ['title', 'contact', 'category', 'priority', 'description'];
 const STATUS_HIDE_DELAY_MS = 4000;
@@ -9,14 +11,28 @@ export function collectTicketPayload(formData) {
 }
 
 export async function submitTicket(ticket, fetchImpl = fetch) {
+  const token = getAuthToken();
+
+  if (!token) {
+    throw new Error('未登录，请先登录');
+  }
+
   const response = await fetchImpl(API_ENDPOINT, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: {
+      'content-type': 'application/json',
+      'authorization': `Bearer ${token}`,
+    },
     body: JSON.stringify(ticket),
   });
   const result = await response.json();
 
   if (!response.ok) {
+    // 如果是 401，清除本地 token
+    if (response.status === 401) {
+      clearAuth();
+      window.location.reload();
+    }
     throw new Error(result.error);
   }
 
