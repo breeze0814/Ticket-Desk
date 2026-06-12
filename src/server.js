@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import { createApp } from './app.js';
 import { createTelegramNotifier } from './telegram.js';
+import { createMailerFromEnv } from './mailer.js';
+import { createAuthServiceFromEnv } from './auth.js';
 
 const DEFAULT_PORT = 3000;
 
@@ -9,7 +11,10 @@ const notifier = createTelegramNotifier({
   chatId: process.env.TELEGRAM_CHAT_ID,
 });
 
-const app = createApp({ notifier });
+const mailer = createMailerFromEnv();
+const authService = createAuthServiceFromEnv(mailer);
+
+const app = createApp({ notifier, authService });
 const port = DEFAULT_PORT;
 
 app.listen(port, () => {
