@@ -8,11 +8,85 @@
     <title>工单通知系统</title>
     <link rel="stylesheet" href="/styles.css">
     <link rel="stylesheet" href="/responsive.css">
+    <link rel="stylesheet" href="/auth.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <script type="module" src="/app.js"></script>
+    <script type="module" src="/auth.js"></script>
   </head>
   <body>
+    <!-- 认证弹窗 -->
+    <div class="auth-modal" data-auth-modal hidden>
+      <div class="auth-modal-overlay"></div>
+      <div class="auth-modal-content">
+        <!-- 步骤 1: 输入邮箱 -->
+        <div class="auth-step" data-email-step>
+          <h2 class="auth-title">🔐 邮箱验证登录</h2>
+          <p class="auth-subtitle">请输入您的邮箱地址</p>
+
+          <div class="auth-field">
+            <label for="auth-email">📧 邮箱地址</label>
+            <input
+              type="email"
+              id="auth-email"
+              data-auth-email
+              placeholder="example@example.com"
+              autocomplete="email"
+            >
+          </div>
+
+          <button class="auth-button primary" data-send-code>
+            <span>发送验证码</span>
+          </button>
+
+          <p class="auth-hint">💡 验证码将发送到您的邮箱</p>
+        </div>
+
+        <!-- 步骤 2: 输入验证码 -->
+        <div class="auth-step" data-code-step hidden>
+          <h2 class="auth-title">🔐 邮箱验证登录</h2>
+          <p class="auth-subtitle">
+            验证码已发送到：<br>
+            <strong data-display-email></strong>
+          </p>
+
+          <div class="auth-field">
+            <label for="auth-code">🔢 验证码（4位数字）</label>
+            <input
+              type="text"
+              id="auth-code"
+              data-auth-code
+              placeholder="1234"
+              maxlength="4"
+              pattern="\d{4}"
+              inputmode="numeric"
+            >
+          </div>
+
+          <p class="auth-resend">
+            没收到？<button class="link-button" data-resend-code>
+              <span data-countdown>60s后重新发送</span>
+            </button>
+          </p>
+
+          <div class="auth-actions">
+            <button class="auth-button secondary" data-back-to-email>
+              ← 返回
+            </button>
+            <button class="auth-button primary" data-verify-code>
+              <span>确认登录</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 状态消息 -->
+        <p class="auth-status" data-auth-status hidden></p>
+      </div>
+    </div>
+
+    <!-- 欢迎消息 -->
+    <div class="welcome-message" data-welcome-message hidden></div>
+
     <main class="shell">
       <section class="workspace" aria-labelledby="page-title">
         <header class="topbar">
