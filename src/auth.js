@@ -196,3 +196,16 @@ export function createAuthService(config) {
     clearCodes: () => verificationCodes.clear() // Exposed for testing
   };
 }
+
+/**
+ * Creates auth service from environment variables
+ * @param {Object} mailer - Mailer instance
+ * @returns {Object} Auth service instance
+ */
+export function createAuthServiceFromEnv(mailer) {
+  return createAuthService({
+    mailer,
+    jwtSecret: process.env.JWT_SECRET,
+    jwtExpiresIn: process.env.JWT_EXPIRES_IN || '24h',
+  });
+}
