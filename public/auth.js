@@ -119,11 +119,17 @@ export function initAuthUI() {
 
     setLoading(verifyButton, true);
     try {
-      await verifyCode(currentEmail, code);
-      hideAuthModal();
-      showWelcome();
+      const result = await verifyCode(currentEmail, code);
+      console.log('[Auth] 登录成功:', result);
       showStatus('登录成功！', 'success');
+
+      // 延迟关闭弹窗，让用户看到成功消息
+      setTimeout(() => {
+        hideAuthModal();
+        showWelcome();
+      }, 500);
     } catch (error) {
+      console.error('[Auth] 登录失败:', error);
       showStatus(error.message, 'error');
     } finally {
       setLoading(verifyButton, false);

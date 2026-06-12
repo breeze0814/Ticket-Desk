@@ -82,6 +82,12 @@
   transition: all 0.2s;
 }
 
+/* 验证码步骤的按钮缩小 */
+.auth-button.compact {
+  padding: 0.6rem 1rem;
+  font-size: 0.9rem;
+}
+
 .auth-button.primary {
   background: var(--accent-blue, #0088cc);
   color: white;
