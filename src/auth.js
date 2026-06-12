@@ -88,19 +88,7 @@ export function createAuthService(config) {
 
     // Send email
     try {
-      await mailer.sendMail({
-        to: email,
-        subject: '登录验证码',
-        html: `
-          <div style="font-family: Arial, sans-serif; padding: 20px;">
-            <h2>登录验证码</h2>
-            <p>您的验证码是：</p>
-            <h1 style="color: #007bff; letter-spacing: 5px;">${code}</h1>
-            <p>此验证码将在3分钟后失效。</p>
-            <p>如果这不是您本人的操作，请忽略此邮件。</p>
-          </div>
-        `
-      });
+      await mailer.sendVerificationCode(email, code);
 
       return {
         success: true,
@@ -109,10 +97,8 @@ export function createAuthService(config) {
     } catch (error) {
       // Remove stored code if email fails
       verificationCodes.delete(email);
-      return {
-        success: false,
-        message: '验证码发送失败'
-      };
+      console.error('[Auth] 邮件发送失败:', error.message);
+      throw new Error(`邮件发送失败: ${error.message}`);
     }
   }
 

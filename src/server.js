@@ -15,7 +15,7 @@ const mailer = createMailerFromEnv();
 const authService = createAuthServiceFromEnv(mailer);
 
 const app = createApp({ notifier, authService });
-const port = DEFAULT_PORT;
+const port = process.env.PORT || DEFAULT_PORT;
 
 app.listen(port, () => {
   console.log(`工单系统已启动: http://localhost:${port}`);
